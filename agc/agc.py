@@ -25,6 +25,8 @@ from typing import Iterator, Dict, List
 # https://github.com/briney/nwalign3
 # ftp://ftp.ncbi.nih.gov/blast/matrices/
 import nwalign3 as nw
+import numpy as np
+np.int = int
 
 __author__ = "Roude JEAN MARIE"
 __copyright__ = "Universite Paris Diderot"
@@ -83,14 +85,16 @@ def read_fasta(amplicon_file: Path, minseqlen: int) -> Iterator[str]:
     :param minseqlen: (int) Minimum amplicon sequence length
     :return: A generator object that provides the Fasta sequences (str).
     """
-    with open(amplicon_file, "r") as fasta_in:
+    with gzip.open(amplicon_file, "rt") as fasta_in:
         iterator = iter(fasta_in)
         line = next(iterator, None)
         while(line):
             sequence = ""
-            line = next(iterator, None)
             while(line[0] != ">"):
                 sequence += line.strip()
+                line = next(iterator, None)
+                if line is None:
+                    break
             line = next(iterator, None)
             if len(sequence) >= minseqlen:
                 yield sequence
@@ -104,7 +108,15 @@ def dereplication_fulllength(amplicon_file: Path, minseqlen: int, mincount: int)
     :param mincount: (int) Minimum amplicon count
     :return: A generator object that provides a (list)[sequences, count] of sequence with a count >= mincount and a length >= minseqlen.
     """
-    pass
+    occ_dict = dict()
+    for sequence in read_fasta(amplicon_file, minseqlen):
+        occ_dict[sequence] = occ_dict.get(sequence, 0) + 1
+    # Sorted dictionnary
+    occ_dict = {key: value for key, value in occ_dict.items() if value >= mincount}
+    for key, value in sorted(occ_dict.items(), key=lambda kv: (kv[1], kv[0])):
+        if value >= mincount:
+            print([key, value])
+            yield [key, value]
 
 def get_identity(alignment_list: List[str]) -> float:
     """Compute the identity rate between two sequences
@@ -112,7 +124,11 @@ def get_identity(alignment_list: List[str]) -> float:
     :param alignment_list:  (list) A list of aligned sequences in the format ["SE-QUENCE1", "SE-QUENCE2"]
     :return: (float) The rate of identity between the two sequences.
     """
-    pass
+    count_same = 0
+    for i, j in zip(alignment_list[0], alignment_list[1]):
+        if i == j:
+            count_same += 1
+    return (count_same / len(alignment_list[0])) * 100
 
 def abundance_greedy_clustering(amplicon_file: Path, minseqlen: int, mincount: int, chunk_size: int, kmer_size: int) -> List:
     """Compute an abundance greedy clustering regarding sequence count and identity.
@@ -125,8 +141,19 @@ def abundance_greedy_clustering(amplicon_file: Path, minseqlen: int, mincount: i
     :param kmer_size: (int) A fournir mais non utilise cette annee
     :return: (list) A list of all the [OTU (str), count (int)] .
     """
-    pass
-
+    depreplication = list(dereplication_fulllength(amplicon_file, minseqlen, mincount))
+    all_otu = [list(depreplication[0])]
+    for sequence, count in depreplication:
+        app = True
+        for seq_j, count_j in all_otu:
+            aligned_seq = nw.global_align(sequence, seq_j,
+                            gap_extend=-1, matrix=str(Path(__file__).parent / "MATCH"))
+            if get_identity(aligned_seq) > 0.97:
+                app = False
+                break
+        if app:
+            all_otu.append([seq_j, count_j])        
+    return all_otu
 
 def write_OTU(OTU_list: List, output_file: Path) -> None:
     """Write the OTU sequence in fasta format.

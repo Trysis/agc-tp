@@ -113,9 +113,8 @@ def dereplication_fulllength(amplicon_file: Path, minseqlen: int, mincount: int)
         occ_dict[sequence] = occ_dict.get(sequence, 0) + 1
     # Sorted dictionnary
     occ_dict = {key: value for key, value in occ_dict.items() if value >= mincount}
-    for key, value in sorted(occ_dict.items(), key=lambda kv: (kv[1], kv[0])):
+    for key, value in sorted(occ_dict.items(), key=lambda kv: (kv[0], kv[1])):
         if value >= mincount:
-            print([key, value])
             yield [key, value]
 
 def get_identity(alignment_list: List[str]) -> float:
@@ -141,18 +140,19 @@ def abundance_greedy_clustering(amplicon_file: Path, minseqlen: int, mincount: i
     :param kmer_size: (int) A fournir mais non utilise cette annee
     :return: (list) A list of all the [OTU (str), count (int)] .
     """
-    depreplication = list(dereplication_fulllength(amplicon_file, minseqlen, mincount))
-    all_otu = [list(depreplication[0])]
-    for sequence, count in depreplication:
+    dereplication = list(dereplication_fulllength(amplicon_file, minseqlen, mincount))
+    all_otu = [list(dereplication[0])]
+    for sequence, count in dereplication[1:]:
         app = True
         for seq_j, count_j in all_otu:
-            aligned_seq = nw.global_align(sequence, seq_j,
-                            gap_extend=-1, matrix=str(Path(__file__).parent / "MATCH"))
-            if get_identity(aligned_seq) > 0.97:
+            aligned_seq = nw.global_align(seq_j, sequence, gap_extend=-1,
+                                         matrix=str(Path(__file__).parent / "MATCH"))
+            if get_identity(aligned_seq) > 97:
                 app = False
                 break
         if app:
-            all_otu.append([seq_j, count_j])        
+            all_otu.append([sequence, count])
+
     return all_otu
 
 def write_OTU(OTU_list: List, output_file: Path) -> None:
@@ -161,7 +161,13 @@ def write_OTU(OTU_list: List, output_file: Path) -> None:
     :param OTU_list: (list) A list of OTU sequences
     :param output_file: (Path) Path to the output file
     """
-    pass
+    write_str = ""
+    for i, (sequence, count) in enumerate(OTU_list):
+        write_str += f">OTU_{i+1} occurrence:{count}\n"
+        write_str += textwrap.fill(sequence, width=80) + "\n"
+
+    with open(output_file, "w") as out:
+        out.write(write_str)
 
 
 #==============================================================

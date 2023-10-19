@@ -26,13 +26,13 @@ from typing import Iterator, Dict, List
 # ftp://ftp.ncbi.nih.gov/blast/matrices/
 import nwalign3 as nw
 
-__author__ = "Your Name"
+__author__ = "Roude JEAN MARIE"
 __copyright__ = "Universite Paris Diderot"
-__credits__ = ["Your Name"]
+__credits__ = ["Roude JEAN MARIE"]
 __license__ = "GPL"
 __version__ = "1.0.0"
-__maintainer__ = "Your Name"
-__email__ = "your@email.fr"
+__maintainer__ = "Roude JEAN MARIE"
+__email__ = "roude.etu@gmail.com"
 __status__ = "Developpement"
 
 
@@ -83,7 +83,17 @@ def read_fasta(amplicon_file: Path, minseqlen: int) -> Iterator[str]:
     :param minseqlen: (int) Minimum amplicon sequence length
     :return: A generator object that provides the Fasta sequences (str).
     """
-    pass
+    with open(amplicon_file, "r") as fasta_in:
+        iterator = iter(fasta_in)
+        line = next(iterator, None)
+        while(line):
+            sequence = ""
+            line = next(iterator, None)
+            while(line[0] != ">"):
+                sequence += line.strip()
+            line = next(iterator, None)
+            if len(sequence) >= minseqlen:
+                yield sequence
 
 
 def dereplication_fulllength(amplicon_file: Path, minseqlen: int, mincount: int) -> Iterator[List]:

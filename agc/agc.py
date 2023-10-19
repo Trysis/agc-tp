@@ -113,7 +113,7 @@ def dereplication_fulllength(amplicon_file: Path, minseqlen: int, mincount: int)
         occ_dict[sequence] = occ_dict.get(sequence, 0) + 1
     # Sorted dictionnary
     occ_dict = {key: value for key, value in occ_dict.items() if value >= mincount}
-    for key, value in sorted(occ_dict.items(), key=lambda kv: (kv[0], kv[1])):
+    for key, value in sorted(occ_dict.items(), key=lambda kv: kv[1], reverse=True):
         if value >= mincount:
             yield [key, value]
 
@@ -145,7 +145,7 @@ def abundance_greedy_clustering(amplicon_file: Path, minseqlen: int, mincount: i
     for sequence, count in dereplication[1:]:
         app = True
         for seq_j, count_j in all_otu:
-            aligned_seq = nw.global_align(seq_j, sequence, gap_extend=-1,
+            aligned_seq = nw.global_align(seq_j, sequence, gap_open=-1, gap_extend=-1,
                                          matrix=str(Path(__file__).parent / "MATCH"))
             if get_identity(aligned_seq) > 97:
                 app = False
@@ -180,7 +180,8 @@ def main(): # pragma: no cover
     # Get arguments
     args = get_arguments()
     # Votre programme ici
-
+    ALL_OTU = abundance_greedy_clustering(args.amplicon_file, args.minseqlen, args.mincount, 0, 0)
+    write_OTU(ALL_OTU, args.output_file)
 
 
 if __name__ == '__main__':
